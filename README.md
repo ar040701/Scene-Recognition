@@ -1,4 +1,4 @@
-🎬 Scene Recognition: AI-Powered Image Understanding 🚀
+#  🎬 Scene Recognition: AI-Powered Image Understanding 🚀 
 🔍 What is it?
 Scene Recognition uses deep learning to classify and understand images! With cutting-edge models like Vision Transformers (ViT), this project enables AI to categorize scenes—whether urban, nature, or indoors. Perfect for robotics, autonomous systems, or media tagging!
 
