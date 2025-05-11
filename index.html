@@ -8,6 +8,13 @@
 <body>
     <div class="container">
         <h1>Scene Recognition using ViT and Dino</h1>
+        
+        <label for="Select-model"> Choose Model: </label>
+            <select id="Select-model">
+                <option value="ViT">ViT</option>
+                <option value="dino">Dino</option>
+            </select>
+       
         <p>Upload an image to identify the scene category.</p>
 
         <div class="upload-box">
@@ -19,8 +26,14 @@
             <img id="preview-image" src="#" alt="Image Preview">
         </div>
 
+        <div class="attention">
+            <h2>Model's Attention Map:</h2>
+            <img id="attention-map" src="#" alt="Attention Map" style="display: none; max-width: 100%; border-radius: 10px;">
+        </div>
+
         <div class="result">
-            <h2 id="result-heading">Predicted Scene:</h2>
+            <!-- <h2 id="result-heading">Predicted Scene:</h2> -->
+            <div id="scores" style="margin-top: 10px; font-family: sans-serif;"></div>
             <p id="result-text">Waiting for input...</p>
         </div>
     </div>
