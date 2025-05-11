@@ -1,6 +1,7 @@
-fastapi
-uvicorn
 torch
 timm
 pillow
 python-multipart
+fastapi==0.75.0
+uvicorn==0.17.6
+gunicorn==20.1.0
