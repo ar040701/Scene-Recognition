@@ -13,6 +13,7 @@
             <select id="Select-model">
                 <option value="ViT">ViT</option>
                 <option value="dino">Dino</option>
+                <option value="swin">Swin</option>
             </select>
        
         <p>Upload an image to identify the scene category.</p>
@@ -26,10 +27,15 @@
             <img id="preview-image" src="#" alt="Image Preview">
         </div>
 
-        <div class="attention">
-            <h2>Model's Attention Map:</h2>
-            <img id="attention-map" src="#" alt="Attention Map" style="display: none; max-width: 100%; border-radius: 10px;">
-        </div>
+    <div class="attention-controls">
+        <label for="layer-select">Layer:</label>
+        <select id="layer-select" onchange="updateAttentionMap()"></select>
+
+        <label for="head-select">Head:</label>
+        <select id="head-select" onchange="updateAttentionMap()"></select>
+    </div>
+
+    <img id="attention-map" src="#" alt="Attention Map" style="display: none; max-width: 100%; border-radius: 10px; margin-top: 10px;">
 
         <div class="result">
             <!-- <h2 id="result-heading">Predicted Scene:</h2> -->

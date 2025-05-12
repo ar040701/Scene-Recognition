@@ -229,3 +229,10 @@ p{
     font-size: 1.1rem;
     color: #666;
 }
+
+.attention-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}

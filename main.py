@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File   # FastAPI imports
+from fastapi import FastAPI, UploadFile, File, Query   # FastAPI imports
 from fastapi.middleware.cors import CORSMiddleware   # CORSMiddleware imports  
 from PIL import Image   # PIL imports
 import torch
@@ -11,7 +11,18 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import base64
-from transformers import ViTForImageClassification
+from transformers import ViTForImageClassification, SwinForImageClassification
+
+class DinoClassifier(nn.Module):
+    def __init__(self, backbone, num_classes):
+        super(DinoClassifier, self).__init__()
+        self.backbone = backbone
+        self.fc = nn.Linear(backbone.num_features, num_classes)
+
+    def forward(self, x):
+        x = self.backbone.forward_features(x)
+        x = self.fc(x)
+        return x
 
 app = FastAPI()
 
@@ -70,17 +81,33 @@ def get_attention_map(image_pil, model):
     base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return base64_img
 
+vit_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224', attn_implementation="eager")
+vit_model.classifier = nn.Linear(vit_model.classifier.in_features, len(class_labels))
+vit_state = torch.load("vit_base.pth", map_location="cpu")
+vit_model.classifier.weight.data = vit_state['classifier.weight']
+vit_model.classifier.bias.data = vit_state['classifier.bias']
+vit_model.load_state_dict(vit_state, strict=False)
+vit_model.eval()
 
-model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224', attn_implementation="eager")  # Assuming 40 classes)
-state_dict = torch.load("vit_base.pth", map_location="cpu")
-custom_classifier_weight = state_dict['classifier.weight']
-custom_classifier_bias = state_dict['classifier.bias']
-model.classifier = nn.Linear(model.classifier.in_features, len(class_labels))
-model.classifier.weight.data = custom_classifier_weight
-model.classifier.bias.data = custom_classifier_bias
-model.load_state_dict(state_dict, strict=False)
+dino_model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
+in_features=768
+dino_model.head = nn.Linear(in_features, len(class_labels))
+dino_state = torch.load("dinov2_80_calr_best.pth", map_location="cpu")
+dino_model.load_state_dict(dino_state, strict=False)
+dino_model.eval()
 
-model.eval()
+swin_model = SwinForImageClassification.from_pretrained('microsoft/swin-tiny-patch4-window7-224')
+swin_model.classifier = nn.Linear(swin_model.classifier.in_features, len(class_labels))
+swin_state = torch.load("swin_66.pth", map_location="cpu")
+swin_model.load_state_dict(swin_state, strict=False)
+swin_model.eval()
+
+print("VIT Classifier Weights Sum:", vit_model.classifier.weight.data.sum())
+print("DINO Classifier Weights Sum:", dino_model.head.weight.data.sum())
+print("Swin Classifier Weights Sum:", swin_model.classifier.weight.data.sum())
+
+print(torch.allclose(vit_model.classifier.weight.data, dino_model.head.weight.data))
+print(torch.allclose(vit_model.classifier.weight.data, swin_model.classifier.weight.data))
 
 # Image transform
 transform = transforms.Compose([
@@ -89,38 +116,92 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
 ])
 
+def extract_all_attention_maps(image_pil, model):
+  try:
+    img_tensor = transform(image_pil).unsqueeze(0)  # [1, 3, 224, 224]
+
+    with torch.no_grad():
+        outputs = model(img_tensor, output_attentions=True)
+        attentions = outputs.attentions  # List of [1, heads, tokens, tokens]
+
+    all_maps = {}
+    image_pil = image_pil.convert("RGBA")
+
+    for layer_idx, layer_attn in enumerate(attentions):
+        for head_idx in range(layer_attn.shape[1]):
+            attn = layer_attn[0, head_idx]  # [tokens, tokens]
+            cls_attn = attn[0, 1:]  # CLS token to patch tokens
+            cls_attn = cls_attn.reshape(14, 14).detach().cpu().numpy()
+
+            # Normalize
+            cls_attn = (cls_attn - cls_attn.min()) / (cls_attn.max() - cls_attn.min())
+            cls_attn_resized = Image.fromarray((cls_attn * 255).astype(np.uint8)).resize(
+                image_pil.size, resample=Image.BILINEAR)
+            cls_attn_resized = np.array(cls_attn_resized)
+
+            # Heatmap overlay
+            heatmap = plt.cm.jet(cls_attn_resized / 255.0)[:, :, :3] * 255
+            heatmap = Image.fromarray(heatmap.astype(np.uint8)).convert("RGBA")
+            overlay = Image.blend(image_pil, heatmap, alpha=0.5)
+
+            # Convert to base64
+            buffer = io.BytesIO()
+            overlay.save(buffer, format="PNG")
+            base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            key = f"layer_{layer_idx}_head_{head_idx}"
+            all_maps[key] = f"data:image/png;base64,{base64_img}"
+
+    return all_maps
+
+  except Exception as e:
+      return {"error": str(e)}
+  
 @app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...), model_name: str = Query("vit", enum=["vit", "dino", "swin"])):
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert("RGB")
         input_tensor = transform(image).unsqueeze(0)  # [1, 3, 224, 224]
 
-        with torch.no_grad():
-            outputs = model(input_tensor,output_attentions=True)
-            logits=outputs.logits
-            probs = torch.nn.functional.softmax(logits, dim=1)[0]
+        if model_name == "vit":
+            model = vit_model
+            with torch.no_grad():
+                outputs = model(input_tensor, output_attentions=True)
+                logits = outputs.logits
+                probs = torch.nn.functional.softmax(logits, dim=1)[0]
+            attention_maps = extract_all_attention_maps(image, model)
 
-            # Get top-5 predictions
-            top5_prob, top5_indices = torch.topk(probs, 5)
-            top5 = [
-                {"label": class_labels[idx], "score": round(prob.item(), 4)}
-                for idx, prob in zip(top5_indices, top5_prob)
-            ]
+        elif model_name == "dino":
+            model = dino_model
+            with torch.no_grad():
+                logits = model(input_tensor)
+                probs = torch.nn.functional.softmax(logits, dim=1)[0]
+            attention_maps = {}
 
-            predicted_label = top5[0]["label"]  # top-1 class
-            # predicted_index = logits.argmax(dim=1).item()
-            # predicted_label = class_labels[predicted_index]
-        
-        attention_map_base64 = get_attention_map(image, model)
+        else:  # swin
+            model = swin_model
+            with torch.no_grad():
+                outputs = model(input_tensor, output_attentions=True)
+                logits = outputs.logits
+                probs = torch.nn.functional.softmax(logits, dim=1)[0]
+            attention_maps = {}
 
-        return {"class": predicted_label,
-                "top5": top5,
-                "attention_map": f"data:image/png;base64,{attention_map_base64}"}
+        # Top-5 predictions
+        top5_prob, top5_indices = torch.topk(probs, 5)
+        top5 = [{"label": class_labels[idx], "score": round(prob.item(), 4)} for idx, prob in zip(top5_indices, top5_prob)]
+        predicted_label = top5[0]["label"]
+
+        return {
+            "class": predicted_label,
+            "top5": top5,
+            "attention_map": attention_maps
+        }
+
 
     except Exception as e:
         return {"error": str(e)}
     
-# if __name__ == "__main__":
-#     port = int(os.environ.get("PORT", 8000)) 
-#     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+if __name__ == "__main__":
+     port = int(os.environ.get("PORT", 8000)) 
+     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
