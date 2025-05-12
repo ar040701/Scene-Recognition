@@ -22,7 +22,8 @@ function predictscene() {
 
     document.getElementById('result-text').innerText = "Loading...";
 
-    fetch('https://Ayush0407-scenerecognition.hf.space/run/predict', {
+    
+    fetch('https://huggingface.co/spaces/Ayush0407/scenerecognition', {
         method: 'POST',
         body: form
     })
