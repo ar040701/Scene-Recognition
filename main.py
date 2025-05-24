@@ -89,13 +89,6 @@ vit_model.classifier.bias.data = vit_state['classifier.bias']
 vit_model.load_state_dict(vit_state, strict=False)
 vit_model.eval()
 
-# dino_model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
-# in_features=768
-# dino_model.head = nn.Linear(in_features, len(class_labels))
-# dino_state = torch.load("dinov2_80_calr_best.pth", map_location="cpu")
-# dino_model.load_state_dict(dino_state, strict=False)
-# dino_model.eval()
-
 swin_model = SwinForImageClassification.from_pretrained('microsoft/swin-tiny-patch4-window7-224')
 swin_model.classifier = nn.Linear(swin_model.classifier.in_features, len(class_labels))
 swin_state = torch.load("swin_66.pth", map_location="cpu")
