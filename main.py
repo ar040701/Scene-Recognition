@@ -89,11 +89,11 @@ vit_model.classifier.bias.data = vit_state['classifier.bias']
 vit_model.load_state_dict(vit_state, strict=False)
 vit_model.eval()
 
-swin_model = SwinForImageClassification.from_pretrained('microsoft/swin-tiny-patch4-window7-224')
-swin_model.classifier = nn.Linear(swin_model.classifier.in_features, len(class_labels))
-swin_state = torch.load("swin_66.pth", map_location="cpu")
-swin_model.load_state_dict(swin_state, strict=False)
-swin_model.eval()
+# swin_model = SwinForImageClassification.from_pretrained('microsoft/swin-tiny-patch4-window7-224')
+# swin_model.classifier = nn.Linear(swin_model.classifier.in_features, len(class_labels))
+# swin_state = torch.load("swin_66.pth", map_location="cpu")
+# swin_model.load_state_dict(swin_state, strict=False)
+# swin_model.eval()
 
 print("VIT Classifier Weights Sum:", vit_model.classifier.weight.data.sum())
 print("DINO Classifier Weights Sum:", dino_model.head.weight.data.sum())
