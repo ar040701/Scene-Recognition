@@ -99,9 +99,6 @@ print("VIT Classifier Weights Sum:", vit_model.classifier.weight.data.sum())
 print("DINO Classifier Weights Sum:", dino_model.head.weight.data.sum())
 print("Swin Classifier Weights Sum:", swin_model.classifier.weight.data.sum())
 
-print(torch.allclose(vit_model.classifier.weight.data, dino_model.head.weight.data))
-print(torch.allclose(vit_model.classifier.weight.data, swin_model.classifier.weight.data))
-
 # Image transform
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
