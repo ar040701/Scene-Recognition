@@ -90,8 +90,6 @@ vit_model.load_state_dict(vit_state, strict=False)
 vit_model.eval()
 
 print("VIT Classifier Weights Sum:", vit_model.classifier.weight.data.sum())
-print("DINO Classifier Weights Sum:", dino_model.head.weight.data.sum())
-print("Swin Classifier Weights Sum:", swin_model.classifier.weight.data.sum())
 
 # Image transform
 transform = transforms.Compose([
