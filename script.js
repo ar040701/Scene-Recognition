@@ -23,15 +23,13 @@ function predictscene() {
     document.getElementById('result-text').innerText = "Loading...";
 
     
-    fetch('https://huggingface.co/spaces/Ayush0407/scenerecognition', {
+    fetch('http://127.0.0.1:8000/predict/', {
         method: 'POST',
         body: form
     })
     .then(response => response.json())
     .then(data => {
         document.getElementById("result-text").innerText = "Predicted Scene: " + (data.class || "Unknown");
-        // document.getElementById("attention-map").src = data.attention_map;
-        // document.getElementById("attention-map").style.display = 'block';
 
         if (data.top5) {
         const scoresContainer = document.getElementById("scores");

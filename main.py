@@ -5,7 +5,6 @@ import torch
 import torchvision.transforms as transforms
 import torch.nn as nn
 import io
-import timm
 import uvicorn
 import os
 import numpy as np
@@ -89,7 +88,25 @@ vit_model.classifier.bias.data = vit_state['classifier.bias']
 vit_model.load_state_dict(vit_state, strict=False)
 vit_model.eval()
 
+dino_model = torch.hub.load('facebookresearch/dino:main', 'dino_vitb16')
+in_features=768
+dino_model.head = nn.Linear(in_features, len(class_labels))
+dino_state = torch.load("dinov2_80_calr_best.pth", map_location="cpu")
+dino_model.load_state_dict(dino_state, strict=False)
+dino_model.eval()
+
+swin_model = SwinForImageClassification.from_pretrained('microsoft/swin-tiny-patch4-window7-224')
+swin_model.classifier = nn.Linear(swin_model.classifier.in_features, len(class_labels))
+swin_state = torch.load("swin_66.pth", map_location="cpu")
+swin_model.load_state_dict(swin_state, strict=False)
+swin_model.eval()
+
 print("VIT Classifier Weights Sum:", vit_model.classifier.weight.data.sum())
+print("DINO Classifier Weights Sum:", dino_model.head.weight.data.sum())
+print("Swin Classifier Weights Sum:", swin_model.classifier.weight.data.sum())
+
+print(torch.allclose(vit_model.classifier.weight.data, dino_model.head.weight.data))
+print(torch.allclose(vit_model.classifier.weight.data, swin_model.classifier.weight.data))
 
 # Image transform
 transform = transforms.Compose([
@@ -120,7 +137,7 @@ def extract_all_attention_maps(image_pil, model):
             cls_attn_resized = Image.fromarray((cls_attn * 255).astype(np.uint8)).resize(
                 image_pil.size, resample=Image.BILINEAR)
             cls_attn_resized = np.array(cls_attn_resized)
-
+            
             # Heatmap overlay
             heatmap = plt.cm.jet(cls_attn_resized / 255.0)[:, :, :3] * 255
             heatmap = Image.fromarray(heatmap.astype(np.uint8)).convert("RGBA")
