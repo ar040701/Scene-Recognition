@@ -23,7 +23,7 @@ function predictscene() {
     document.getElementById('result-text').innerText = "Loading...";
 
     
-    fetch('http://127.0.0.1:8000/predict/', {
+    fetch('https://ayush0407-scenerecognition.hf.space/predict/', {
         method: 'POST',
         body: form
     })
